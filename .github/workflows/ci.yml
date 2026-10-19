@@ -1,0 +1,41 @@
+
+name: TeamFlow CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Django Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create test environment
+        run: |
+          echo "POSTGRES_PASSWORD=ci-only-test-password" > .env
+
+      - name: Build and start containers
+        run: docker compose up --build -d --wait
+
+      - name: Apply database migrations
+        run: docker compose exec -T web python manage.py migrate
+
+      - name: Run Django tests
+        run: docker compose exec -T web python manage.py test
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v
